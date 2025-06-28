@@ -10,20 +10,37 @@ initResize(WASM_MODULE);
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    const targetUrl = url.searchParams.get('url');
+    let targetUrl = url.searchParams.get('url');
 
     if (!targetUrl) {
       return new Response('Missing url parameter', { status: 400 });
     }
 
+    // Automatically add https:// if no protocol is present
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+    }
+
     try {
       const iconUrl = await findFavicon(targetUrl);
-      const iconBuffer = await fetch(iconUrl).then((res) => res.arrayBuffer());
-      const resizedIcon = await resize(iconBuffer, { width: 64, height: 64 });
+      const iconResponse = await fetch(iconUrl);
+      const iconBuffer = await iconResponse.arrayBuffer();
+      const contentType = iconResponse.headers.get('Content-Type') || 'image/png';
+
+      let finalIconBuffer = iconBuffer;
+      let finalContentType = contentType;
+
+      // Try to resize, but fallback to original if it fails (e.g., for .ico files)
+      try {
+        finalIconBuffer = await resize(iconBuffer, { width: 64, height: 64 });
+        finalContentType = 'image/png'; // Resize operation outputs PNG
+      } catch (resizeError) {
+        console.error(`Could not resize icon from ${iconUrl}, serving original. Error: ${resizeError}`);
+      }
       
-      return new Response(resizedIcon, {
+      return new Response(finalIconBuffer, {
         headers: {
-          'Content-Type': 'image/png',
+          'Content-Type': finalContentType,
           'Cache-Control': 'public, max-age=86400', // Cache for 1 day
         },
       });
