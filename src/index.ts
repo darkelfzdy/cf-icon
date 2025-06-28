@@ -1,10 +1,9 @@
-import resize, { initResize } from '@jsquash/resize';
 
-// This is the binding to the wasm module in wrangler.toml
-declare const WASM_MODULE: ArrayBuffer;
+import resize from '@jsquash/resize';
+// @ts-ignore
+import wasmModule from '../node_modules/@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm';
 
-// Initialize the wasm module
-initResize(WASM_MODULE);
+let wasmReady = WebAssembly.instantiate(wasmModule);
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -21,6 +20,9 @@ export default {
     }
 
     try {
+      // Ensure wasm is ready before processing
+      await wasmReady;
+
       const iconUrl = await findFavicon(targetUrl);
       const iconResponse = await fetch(iconUrl);
       const iconBuffer = await iconResponse.arrayBuffer();
