@@ -2,6 +2,7 @@ name = "cf-icon"
 main = "src/index.ts"
 compatibility_date = "2024-03-20"
 
-[[wasm_modules]]
-binding = "WASM_MODULE"
-module = "node_modules/@jsquash/resize/lib/resize.wasm"
+[[modules]]
+type = "Wasm"
+name = "WASM_MODULE"
+path = "node_modules/@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm"
