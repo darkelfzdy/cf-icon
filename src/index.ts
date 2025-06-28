@@ -1,12 +1,4 @@
 
-import resize, { initResize } from '@jsquash/resize';
-
-// This is the binding to the wasm module in wrangler.toml
-declare const WASM_MODULE: ArrayBuffer;
-
-// Initialize the wasm module
-initResize(WASM_MODULE);
-
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -24,29 +16,17 @@ export default {
     try {
       const iconUrl = await findFavicon(targetUrl);
       const iconResponse = await fetch(iconUrl);
-      const iconBuffer = await iconResponse.arrayBuffer();
-      const contentType = iconResponse.headers.get('Content-Type') || 'image/png';
 
-      let finalIconBuffer = iconBuffer;
-      let finalContentType = contentType;
-
-      // Try to resize, but fallback to original if it fails (e.g., for .ico files)
-      try {
-        finalIconBuffer = await resize(iconBuffer, { width: 64, height: 64 });
-        finalContentType = 'image/png'; // Resize operation outputs PNG
-      } catch (resizeError) {
-        console.error(`Could not resize icon from ${iconUrl}, serving original. Error: ${resizeError}`);
-      }
-      
-      return new Response(finalIconBuffer, {
+      // Return the original icon directly
+      return new Response(iconResponse.body, {
         headers: {
-          'Content-Type': finalContentType,
+          'Content-Type': iconResponse.headers.get('Content-Type') || 'application/octet-stream',
           'Cache-Control': 'public, max-age=86400', // Cache for 1 day
         },
       });
     } catch (error) {
       console.error(error);
-      return new Response('Could not find favicon', { status: 404 });
+      return new Response(`Could not find favicon for ${targetUrl}. Error: ${error}`, { status: 404 });
     }
   },
 };
