@@ -1,0 +1,26 @@
+{
+  "name": "cf-icon",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/darkelfzdy/cf-icon.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/darkelfzdy/cf-icon/issues"
+  },
+  "homepage": "https://github.com/darkelfzdy/cf-icon#readme",
+  "description": "",
+  "devDependencies": {
+    "wrangler": "^4.22.0"
+  },
+  "dependencies": {
+    "@jsquash/resize": "^2.1.0"
+  }
+}
