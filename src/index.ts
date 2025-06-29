@@ -169,7 +169,7 @@ export default {
 
       // Try to resize, but fallback to original if it fails (e.g., for .ico files)
       try {
-        finalIconBuffer = await resize(iconBuffer, { width: 32, height: 32 });
+        finalIconBuffer = await resize(iconBuffer, { width: 64, height: 64 });
         finalContentType = 'image/png'; // Resize operation outputs PNG
       } catch (resizeError) {
         console.error(`Could not resize icon from ${iconUrl}, serving original. Error: ${resizeError}`);
