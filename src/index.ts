@@ -26,7 +26,9 @@ function scoreCandidate(candidate: { href: string; rel: string | null; sizes: st
 
   // 2. 基于 rel 属性评分
   if (rel?.includes('apple-touch-icon')) {
-    score += 500;
+    score += 650;
+  } else if (rel === 'manifest-icon') {
+    score += 650;
   } else if (rel?.includes('icon')) {
     score += 100;
   }
@@ -44,9 +46,9 @@ function scoreCandidate(candidate: { href: string; rel: string | null; sizes: st
     }
   }
   
-  // og:image 作为备选，给予一个固定的分数
+  // og:image 作为最后的备选，给予一个固定的低分
   if (rel === 'og:image') {
-      score = 150; // 比大多数普通 icon 高，但比 apple-touch-icon 低
+      score = 50; // 保证其优先级低于所有其他类型的 icon
   }
 
   return score;
@@ -54,6 +56,7 @@ function scoreCandidate(candidate: { href: string; rel: string | null; sizes: st
 
 async function findBestIcon(targetUrl: URL): Promise<string> {
   const candidates: IconCandidate[] = [];
+  let manifestUrl: string | null = null;
 
   // 处理器，用于收集所有可能的图标链接
   class IconCollector {
@@ -70,6 +73,11 @@ async function findBestIcon(targetUrl: URL): Promise<string> {
           href = element.getAttribute('href');
           sizes = element.getAttribute('sizes');
           type = element.getAttribute('type');
+        } else if (rel === 'manifest') {
+          const manifestHref = element.getAttribute('href');
+          if (manifestHref) {
+            manifestUrl = new URL(manifestHref, targetUrl).toString();
+          }
         }
       } else if (tagName === 'meta') {
         const property = element.getAttribute('property');
@@ -108,6 +116,33 @@ async function findBestIcon(targetUrl: URL): Promise<string> {
     }
   } catch (e) {
     console.error(`Failed to fetch or parse HTML from ${targetUrl}:`, e);
+  }
+
+  // 1.1 解析 manifest.json
+  if (manifestUrl) {
+    try {
+      const manifestResponse = await fetch(manifestUrl);
+      if (manifestResponse.ok) {
+        const manifest = await manifestResponse.json();
+        if (manifest.icons && Array.isArray(manifest.icons)) {
+          for (const icon of manifest.icons) {
+            if (icon.src) {
+              const { src, sizes, type } = icon;
+              const score = scoreCandidate({ href: src, rel: 'manifest-icon', sizes, type });
+              candidates.push({
+                url: new URL(src, manifestUrl).toString(),
+                sizes,
+                type,
+                score,
+                rel: 'manifest-icon',
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error(`Failed to fetch or parse manifest.json from ${manifestUrl}:`, e);
+    }
   }
 
   // 2. 如果从 HTML 中找到了候选者，则进行评分和选择
