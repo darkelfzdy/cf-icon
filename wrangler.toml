@@ -2,30 +2,7 @@ name = "cf-icon"
 main = "src/index.ts"
 compatibility_date = "2024-03-20"
 
-[[wasm_modules]]
-name = "RESIZE_WASM"
-path = "node_modules/@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm"
-
-[[wasm_modules]]
-name = "PNG_DEC_WASM"
-path = "node_modules/@jsquash/png/lib/decode/pkg/squoosh_png_bg.wasm"
-
-[[wasm_modules]]
-name = "PNG_ENC_WASM"
-path = "node_modules/@jsquash/png/lib/encode/pkg/squoosh_png_bg.wasm"
-
-[[wasm_modules]]
-name = "JPEG_DEC_WASM"
-path = "node_modules/@jsquash/jpeg/lib/decode/pkg/squoosh_jpeg_bg.wasm"
-
-[[wasm_modules]]
-name = "JPEG_ENC_WASM"
-path = "node_modules/@jsquash/jpeg/lib/encode/pkg/squoosh_jpeg_bg.wasm"
-
-[[wasm_modules]]
-name = "WEBP_DEC_WASM"
-path = "node_modules/@jsquash/webp/lib/decode/pkg/squoosh_webp_bg.wasm"
-
-[[wasm_modules]]
-name = "WEBP_ENC_WASM"
-path = "node_modules/@jsquash/webp/lib/encode/pkg/squoosh_webp_bg.wasm"
+[build]
+rules = [
+  { type = "Wasm", globs = ["**/*.wasm"] }
+]

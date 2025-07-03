@@ -1,32 +1,28 @@
+
 import resize, { init as initResize } from '@jsquash/resize';
-import { decode as pngDecode, encode as pngEncode, init as initPngDecode } from '@jsquash/png';
-import { decode as jpegDecode, encode as jpegEncode, init as initJpegDecode } from '@jsquash/jpeg';
-import { decode as webpDecode, encode as webpEncode, init as initWebpDecode } from '@jsquash/webp';
+import { decode as pngDecode, encode as pngEncode, init as initPng } from '@jsquash/png';
+import { decode as jpegDecode, encode as jpegEncode, init as initJpeg } from '@jsquash/jpeg';
+import { decode as webpDecode, encode as webpEncode, init as initWebp } from '@jsquash/webp';
 
-// WASM modules are imported via wasm_modules in wrangler.toml
-// @ts-ignore
-import resizeWasm from 'RESIZE_WASM';
-// @ts-ignore
-import pngDecWasm from 'PNG_DEC_WASM';
-// @ts-ignore
-import pngEncWasm from 'PNG_ENC_WASM';
-// @ts-ignore
-import jpegDecWasm from 'JPEG_DEC_WASM';
-// @ts-ignore
-import jpegEncWasm from 'JPEG_ENC_WASM';
-// @ts-ignore
-import webpDecWasm from 'WEBP_DEC_WASM';
-// @ts-ignore
-import webpEncWasm from 'WEBP_ENC_WASM';
+// Import WASM files directly as ES Modules
+// This is enabled by the build rule in wrangler.toml
+import resizeWasm from '../node_modules/@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm';
+import pngDecWasm from '../node_modules/@jsquash/png/lib/decode/pkg/squoosh_png_bg.wasm';
+import pngEncWasm from '../node_modules/@jsquash/png/lib/encode/pkg/squoosh_png_bg.wasm';
+import jpegDecWasm from '../node_modules/@jsquash/jpeg/lib/decode/pkg/squoosh_jpeg_bg.wasm';
+import jpegEncWasm from '../node_modules/@jsquash/jpeg/lib/encode/pkg/squoosh_jpeg_bg.wasm';
+import webpDecWasm from '../node_modules/@jsquash/webp/lib/decode/pkg/squoosh_webp_bg.wasm';
+import webpEncWasm from '../node_modules/@jsquash/webp/lib/encode/pkg/squoosh_webp_bg.wasm';
 
+// Initialize all WASM modules
 const wasmReady = Promise.all([
   initResize(resizeWasm),
-  initPngDecode(pngDecWasm),
-  initPngDecode(pngEncWasm),
-  initJpegDecode(jpegDecWasm),
-  initJpegDecode(jpegEncWasm),
-  initWebpDecode(webpDecWasm),
-  initWebpDecode(webpEncWasm),
+  initPng(pngDecWasm),
+  initPng(pngEncWasm),
+  initJpeg(jpegDecWasm),
+  initJpeg(jpegEncWasm),
+  initWebp(webpDecWasm),
+  initWebp(webpEncWasm),
 ]);
 
 
