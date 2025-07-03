@@ -1,24 +1,20 @@
-
 import resize, { init as initResize } from '@jsquash/resize';
 import { decode as pngDecode, encode as pngEncode, init as initPng } from '@jsquash/png';
 import { decode as jpegDecode, encode as jpegEncode, init as initJpeg } from '@jsquash/jpeg';
 import { decode as webpDecode, encode as webpEncode, init as initWebp } from '@jsquash/webp';
 
-// Import WASM files directly as ES Modules
-// This is enabled by the build rule in wrangler.toml
-import resizeWasm from '../node_modules/@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm';
-import pngDecWasm from '../node_modules/@jsquash/png/lib/decode/pkg/squoosh_png_bg.wasm';
-import pngEncWasm from '../node_modules/@jsquash/png/lib/encode/pkg/squoosh_png_bg.wasm';
-import jpegDecWasm from '../node_modules/@jsquash/jpeg/lib/decode/pkg/squoosh_jpeg_bg.wasm';
-import jpegEncWasm from '../node_modules/@jsquash/jpeg/lib/encode/pkg/squoosh_jpeg_bg.wasm';
-import webpDecWasm from '../node_modules/@jsquash/webp/lib/decode/pkg/squoosh_webp_bg.wasm';
-import webpEncWasm from '../node_modules/@jsquash/webp/lib/encode/pkg/squoosh_webp_bg.wasm';
+// Import WASM files from the local wasm directory
+import resizeWasm from '../wasm/resize.wasm';
+import pngWasm from '../wasm/png.wasm';
+import jpegDecWasm from '../wasm/jpeg_dec.wasm';
+import jpegEncWasm from '../wasm/jpeg_enc.wasm';
+import webpDecWasm from '../wasm/webp_dec.wasm';
+import webpEncWasm from '../wasm/webp_enc.wasm';
 
 // Initialize all WASM modules
 const wasmReady = Promise.all([
   initResize(resizeWasm),
-  initPng(pngDecWasm),
-  initPng(pngEncWasm),
+  initPng(pngWasm),
   initJpeg(jpegDecWasm),
   initJpeg(jpegEncWasm),
   initWebp(webpDecWasm),
