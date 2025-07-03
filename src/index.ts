@@ -1,11 +1,36 @@
+import resize, { init as initResize } from '@jsquash/resize';
+import { decode as pngDecode, encode as pngEncode, init as initPngDecode } from '@jsquash/png';
+import { decode as jpegDecode, encode as jpegEncode, init as initJpegDecode } from '@jsquash/jpeg';
+import { decode as webpDecode, encode as webpEncode, init as initWebpDecode } from '@jsquash/webp';
 
-import resize from '@jsquash/resize';
+// WASM modules are imported via wasm_modules in wrangler.toml
 // @ts-ignore
-import wasmModule from '../node_modules/@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm';
+import resizeWasm from 'RESIZE_WASM';
+// @ts-ignore
+import pngDecWasm from 'PNG_DEC_WASM';
+// @ts-ignore
+import pngEncWasm from 'PNG_ENC_WASM';
+// @ts-ignore
+import jpegDecWasm from 'JPEG_DEC_WASM';
+// @ts-ignore
+import jpegEncWasm from 'JPEG_ENC_WASM';
+// @ts-ignore
+import webpDecWasm from 'WEBP_DEC_WASM';
+// @ts-ignore
+import webpEncWasm from 'WEBP_ENC_WASM';
 
-let wasmReady = WebAssembly.instantiate(wasmModule);
+const wasmReady = Promise.all([
+  initResize(resizeWasm),
+  initPngDecode(pngDecWasm),
+  initPngDecode(pngEncWasm),
+  initJpegDecode(jpegDecWasm),
+  initJpegDecode(jpegEncWasm),
+  initWebpDecode(webpDecWasm),
+  initWebpDecode(webpEncWasm),
+]);
 
-// 定义一个接口来规范候选图标的数据结构
+
+// Defines the structure for an icon candidate
 interface IconCandidate {
   url: string;
   rel?: string | null;
@@ -14,17 +39,17 @@ interface IconCandidate {
   score: number;
 }
 
-// 评分函数，这是实现“高质量”选择的核心
+// Scores a candidate icon based on its attributes to determine the best quality
 function scoreCandidate(candidate: { href: string; rel: string | null; sizes: string | null; type: string | null }): number {
   let score = 0;
   const { href, rel, sizes, type } = candidate;
 
-  // 1. 基于文件类型评分
+  // Score based on file type
   if (href.endsWith('.svg') || type === 'image/svg+xml') {
-    score += 1000; // SVG 优先
+    score += 1000; // SVG is preferred
   }
 
-  // 2. 基于 rel 属性评分
+  // Score based on 'rel' attribute
   if (rel?.includes('apple-touch-icon')) {
     score += 650;
   } else if (rel === 'manifest-icon') {
@@ -33,32 +58,32 @@ function scoreCandidate(candidate: { href: string; rel: string | null; sizes: st
     score += 100;
   }
 
-  // 3. 基于 sizes 属性评分
+  // Score based on 'sizes' attribute
   if (sizes) {
     if (sizes === 'any') {
-      score += 500; // 'any' 通常用于 SVG，给予高分
+      score += 500; // 'any' is often for SVGs
     } else {
-      // 解析尺寸，例如 "180x180"
       const sizeMatch = sizes.match(/(\d+)x(\d+)/);
       if (sizeMatch) {
-        score += parseInt(sizeMatch[1], 10); // 使用宽度作为分数的一部分
+        score += parseInt(sizeMatch[1], 10); // Use width as part of the score
       }
     }
   }
   
-  // og:image 作为最后的备选，给予一个固定的低分
+  // og:image is a low-priority fallback
   if (rel === 'og:image') {
-      score = 50; // 保证其优先级低于所有其他类型的 icon
+      score = 50;
   }
 
   return score;
 }
 
+// Finds the best possible icon for a given URL
 async function findBestIcon(targetUrl: URL): Promise<string> {
   const candidates: IconCandidate[] = [];
   let manifestUrl: string | null = null;
 
-  // 处理器，用于收集所有可能的图标链接
+  // HTMLRewriter to collect icon links from the page
   class IconCollector {
     element(element: Element) {
       const tagName = element.tagName;
@@ -83,7 +108,7 @@ async function findBestIcon(targetUrl: URL): Promise<string> {
         const property = element.getAttribute('property');
         if (property === 'og:image') {
           href = element.getAttribute('content');
-          rel = 'og:image'; // 自定义一个 rel 用于评分
+          rel = 'og:image';
         }
       }
 
@@ -104,7 +129,7 @@ async function findBestIcon(targetUrl: URL): Promise<string> {
     }
   }
 
-  // 1. 解析 HTML 并收集所有候选图标
+  // 1. Parse HTML to find icon candidates
   try {
     const response = await fetch(targetUrl.toString(), {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' }
@@ -118,7 +143,7 @@ async function findBestIcon(targetUrl: URL): Promise<string> {
     console.error(`Failed to fetch or parse HTML from ${targetUrl}:`, e);
   }
 
-  // 1.1 解析 manifest.json
+  // 2. Parse manifest.json if found
   if (manifestUrl) {
     try {
       const manifestResponse = await fetch(manifestUrl);
@@ -145,14 +170,14 @@ async function findBestIcon(targetUrl: URL): Promise<string> {
     }
   }
 
-  // 2. 如果从 HTML 中找到了候选者，则进行评分和选择
+  // 3. Select the best candidate
   if (candidates.length > 0) {
     candidates.sort((a, b) => b.score - a.score);
     console.log("Found candidates:", candidates);
     return candidates[0].url;
   }
 
-  // 3. 如果 HTML 中没有找到，尝试 /favicon.ico
+  // 4. Fallback to /favicon.ico
   try {
     const faviconUrl = new URL('/favicon.ico', targetUrl);
     const res = await fetch(faviconUrl.toString(), { method: 'HEAD' });
@@ -160,10 +185,10 @@ async function findBestIcon(targetUrl: URL): Promise<string> {
       return faviconUrl.toString();
     }
   } catch (e) {
-    // 忽略错误，继续下一个后备方案
+    // Continue to next fallback
   }
 
-  // 4. 最后的后备方案：使用 Google Favicon 服务
+  // 5. Final fallback to Google's favicon service
   return `https://www.google.com/s2/favicons?domain=${targetUrl.hostname}&sz=128`;
 }
 
@@ -176,7 +201,6 @@ export default {
       return new Response('Missing url parameter', { status: 400 });
     }
 
-    // Automatically add https:// if no protocol is present
     if (!targetParam.startsWith('http://') && !targetParam.startsWith('https://')) {
         targetParam = 'https://' + targetParam;
     }
@@ -184,7 +208,6 @@ export default {
     const targetUrl = new URL(targetParam);
 
     try {
-      // Ensure wasm is ready before processing
       await wasmReady;
 
       const iconUrl = await findBestIcon(targetUrl);
@@ -199,21 +222,30 @@ export default {
       const iconBuffer = await iconResponse.arrayBuffer();
       const contentType = iconResponse.headers.get('Content-Type') || 'image/png';
 
-      let finalIconBuffer = iconBuffer;
-      let finalContentType = contentType;
-
-      // Try to resize, but fallback to original if it fails (e.g., for .ico files)
-      try {
-        finalIconBuffer = await resize(iconBuffer, { width: 64, height: 64 });
-        finalContentType = 'image/png'; // Resize operation outputs PNG
-      } catch (resizeError) {
-        console.error(`Could not resize icon from ${iconUrl}, serving original. Error: ${resizeError}`);
+      let imageData;
+      if (contentType.includes('png')) {
+        imageData = await pngDecode(iconBuffer);
+      } else if (contentType.includes('jpeg')) {
+        imageData = await jpegDecode(iconBuffer);
+      } else if (contentType.includes('webp')) {
+        imageData = await webpDecode(iconBuffer);
+      } else {
+        // If the content type is not supported for resizing, return the original icon
+        return new Response(iconBuffer, {
+          headers: {
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=86400',
+          },
+        });
       }
+
+      const resizedImageData = await resize(imageData, { width: 64, height: 64 });
+      const finalIconBuffer = await pngEncode(resizedImageData);
       
       return new Response(finalIconBuffer, {
         headers: {
-          'Content-Type': finalContentType,
-          'Cache-Control': 'public, max-age=86400', // Cache for 1 day
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=86400',
         },
       });
     } catch (error) {
