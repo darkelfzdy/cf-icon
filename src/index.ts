@@ -1,9 +1,14 @@
 import resize, { init as initResize } from '@jsquash/resize';
 import { decode as pngDecode, encode as pngEncode, init as initPng } from '@jsquash/png';
-import { decode as jpegDecode, encode as jpegEncode, init as initJpeg } from '@jsquash/jpeg';
-import { decode as webpDecode, encode as webpEncode, init as initWebp } from '@jsquash/webp';
+import { decode as jpegDecode, init as initJpegDecode } from '@jsquash/jpeg/decode';
+import { encode as jpegEncode, init as initJpegEncode } from '@jsquash/jpeg/encode';
+// Correct imports for webp decode and encode with their respective init functions
+import { decode as webpDecode, init as initWebpDecode } from '@jsquash/webp/decode';
+import { encode as webpEncode, init as initWebpEncode } from '@jsquash/webp/encode';
 
 // Import WASM files from the local wasm directory
+// These imports are typically handled by bundlers to provide ArrayBuffer or WebAssembly.Module
+// For Cloudflare Workers, with `wrangler.toml` build rules, these should be available as ArrayBuffer.
 import resizeWasm from '../wasm/resize.wasm';
 import pngWasm from '../wasm/png.wasm';
 import jpegDecWasm from '../wasm/jpeg_dec.wasm';
@@ -12,13 +17,15 @@ import webpDecWasm from '../wasm/webp_dec.wasm';
 import webpEncWasm from '../wasm/webp_enc.wasm';
 
 // Initialize all WASM modules
+// Each init function expects an ArrayBuffer.
+// Assuming the `import ... from \'...wasm\'` provides an ArrayBuffer due to wrangler.toml build rules.
 const wasmReady = Promise.all([
   initResize(resizeWasm),
   initPng(pngWasm),
-  initJpeg(jpegDecWasm),
-  initJpeg(jpegEncWasm),
-  initWebp(webpDecWasm),
-  initWebp(webpEncWasm),
+  initJpegDecode(jpegDecWasm),
+  initJpegEncode(jpegEncWasm),
+  initWebpDecode(webpDecWasm),
+  initWebpEncode(webpEncWasm),
 ]);
 
 
