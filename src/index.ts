@@ -10,10 +10,10 @@ import { encode as webpEncode, init as initWebpEncode } from '@jsquash/webp/enco
 // Import WASM files from the local wasm directory
 // These imports are typically handled by bundlers to provide ArrayBuffer or WebAssembly.Module
 // For Cloudflare Workers, with `wrangler.toml` build rules, these should be available as ArrayBuffer.
-import resizeWasm from '../wasm/resize.wasm';
-import pngWasm from '../wasm/png.wasm';
-import jpegDecWasm from '../wasm/jpeg_dec.wasm';
-import jpegEncWasm from '../wasm/jpeg_enc.wasm';
+import resizeWasm from '../wasm/squoosh_resize_bg.wasm';
+import pngWasm from '../wasm/squoosh_png_bg.wasm';
+import jpegDecWasm from '../wasm/mozjpeg_dec.wasm';
+import jpegEncWasm from '../wasm/mozjpeg_enc.wasm';
 import webpDecWasm from '../wasm/webp_dec.wasm';
 import webpEncWasm from '../wasm/webp_enc.wasm';
 
