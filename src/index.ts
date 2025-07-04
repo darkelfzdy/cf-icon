@@ -1,9 +1,10 @@
-import resize, { init as initResize } from '@jsquash/resize';
-import { decode as pngDecode, encode as pngEncode, init as initPng } from '@jsquash/png';
-import { decode as jpegDecode, init as initJpegDecode } from '@jsquash/jpeg/decode';
+import resize, { initResize } from '@jsquash/resize';
+import { decode as pngDecode, encode as pngEncode } from '@jsquash/png';
+import { init as initPng } from '@jsquash/png/decode';
+import jpegDecode, { init as initJpegDecode } from '@jsquash/jpeg/decode';
 import { encode as jpegEncode, init as initJpegEncode } from '@jsquash/jpeg/encode';
 // Correct imports for webp decode and encode with their respective init functions
-import { decode as webpDecode, init as initWebpDecode } from '@jsquash/webp/decode';
+import webpDecode, { init as initWebpDecode } from '@jsquash/webp/decode';
 import { encode as webpEncode, init as initWebpEncode } from '@jsquash/webp/encode';
 
 // Import WASM files from the local wasm directory
