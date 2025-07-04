@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "mkdir -p wasm && cp /home/coder/project/cf-icon/node_modules/@jsquash/jpeg/codec/dec/mozjpeg_dec.wasm /home/coder/project/cf-icon/node_modules/@jsquash/jpeg/codec/enc/mozjpeg_enc.wasm /home/coder/project/cf-icon/node_modules/@jsquash/png/codec/pkg/squoosh_png_bg.wasm /home/coder/project/cf-icon/node_modules/@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm /home/coder/project/cf-icon/node_modules/@jsquash/webp/codec/dec/webp_dec.wasm /home/coder/project/cf-icon/node_modules/@jsquash/webp/codec/enc/webp_enc.wasm wasm/"
+    "postinstall": "mkdir -p wasm && cp node_modules/@jsquash/jpeg/codec/dec/mozjpeg_dec.wasm node_modules/@jsquash/jpeg/codec/enc/mozjpeg_enc.wasm node_modules/@jsquash/png/codec/pkg/squoosh_png_bg.wasm node_modules/@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm node_modules/@jsquash/webp/codec/dec/webp_dec.wasm node_modules/@jsquash/webp/codec/enc/webp_enc.wasm wasm/"
   },
   "repository": {
     "type": "git",
