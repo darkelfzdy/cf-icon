@@ -6,6 +6,7 @@ import { encode as jpegEncode, init as initJpegEncode } from '@jsquash/jpeg/enco
 // Correct imports for webp decode and encode with their respective init functions
 import webpDecode, { init as initWebpDecode } from '@jsquash/webp/decode';
 import { encode as webpEncode, init as initWebpEncode } from '@jsquash/webp/encode';
+import decodeIco from 'decode-ico';
 
 // Import WASM files from the local wasm directory
 // These imports are typically handled by bundlers to provide ArrayBuffer or WebAssembly.Module
@@ -229,6 +230,16 @@ export default {
         imageData = await jpegDecode(iconBuffer);
       } else if (contentType.includes('webp')) {
         imageData = await webpDecode(iconBuffer);
+      } else if (contentType.includes('ico') || contentType.includes('x-icon') || contentType.includes('vnd.microsoft.icon')) {
+        const decodedIcos = decodeIco(iconBuffer);
+        // From the multiple images in an ICO file, select the largest one.
+        const bestIco = decodedIcos.reduce((a, b) => a.width > b.width ? a : b);
+        // Convert it to the format required by @jsquash/resize.
+        imageData = {
+          data: new Uint8ClampedArray(bestIco.data),
+          width: bestIco.width,
+          height: bestIco.height,
+        };
       } else {
         // If the content type is not supported for resizing, return the original icon
         return new Response(iconBuffer, {
