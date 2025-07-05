@@ -250,7 +250,7 @@ export default {
         });
       }
 
-      const resizedImageData = await resize(imageData, { width: 32, height: 32 });
+      const resizedImageData = await resize(imageData, { width: 48, height: 48 });
       const finalIconBuffer = await pngEncode(resizedImageData);
       
       return new Response(finalIconBuffer, {
