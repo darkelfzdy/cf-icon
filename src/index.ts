@@ -2,11 +2,13 @@ import resize, { initResize } from '@jsquash/resize';
 import { decode as pngDecode, encode as pngEncode } from '@jsquash/png';
 import { init as initPng } from '@jsquash/png/decode';
 import jpegDecode, { init as initJpegDecode } from '@jsquash/jpeg/decode';
-import { encode as jpegEncode, init as initJpegEncode } from '@jsquash/jpeg/encode';
+import jpegEncode, { init as initJpegEncode } from '@jsquash/jpeg/encode';
 // Correct imports for webp decode and encode with their respective init functions
 import webpDecode, { init as initWebpDecode } from '@jsquash/webp/decode';
-import { encode as webpEncode, init as initWebpEncode } from '@jsquash/webp/encode';
+import webpEncode, { init as initWebpEncode } from '@jsquash/webp/encode';
 import decodeIco from 'decode-ico';
+import { fetchIconList } from './lib';
+import type { Icon, ScoredIcon } from './types';
 
 // Import WASM files from the local wasm directory
 // These imports are typically handled by bundlers to provide ArrayBuffer or WebAssembly.Module
@@ -29,19 +31,6 @@ const wasmReady = Promise.all([
   initWebpDecode(webpDecWasm),
   initWebpEncode(webpEncWasm),
 ]);
-
-
-// Defines the structure for an icon from the external API
-interface Icon {
-  href: string;
-  sizes: string;
-}
-
-// Defines a scored icon structure for sorting
-interface ScoredIcon {
-  icon: Icon;
-  score: number;
-}
 
 // Calculates a score for a given icon based on format, size, and source
 function calculateScore(icon: Icon): number {
@@ -94,20 +83,8 @@ export default {
       return new Response("Invalid domain or URL provided: " + path, { status: 400 });
     }
 
-    // 2. Call external API
-    const apiUrl = `https://favicon-downloader-37l.pages.dev/api/favicon/${domain}`;
-    let apiResponse;
-    try {
-      apiResponse = await fetch(apiUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-      if (!apiResponse.ok) {
-        return new Response(`API fetch failed with status: ${apiResponse.status}`, { status: 502 });
-      }
-    } catch (e) {
-      return new Response('API fetch failed.', { status: 502 });
-    }
-    
-    const data = await apiResponse.json();
-    const icons: Icon[] = data.icons || [];
+    // 2. Fetch icon list using local logic
+    const icons: Icon[] = await fetchIconList(domain);
 
     if (icons.length === 0) {
       return new Response("No icons found from API.", { status: 404 });
@@ -160,7 +137,7 @@ export default {
 
         // For bitmaps, decode, resize, and encode
         const imageBuffer = await imageResponse.arrayBuffer();
-        let imageData;
+        let imageData: ImageData;
 
         if (contentType.includes('png')) {
           imageData = await pngDecode(imageBuffer);
@@ -171,7 +148,7 @@ export default {
         } else if (contentType.includes('ico') || contentType.includes('x-icon')) {
           const decodedIcos = decodeIco(imageBuffer);
           const bestIco = decodedIcos.reduce((a, b) => a.width > b.width ? a : b);
-          imageData = { data: new Uint8ClampedArray(bestIco.data), width: bestIco.width, height: bestIco.height };
+          imageData = { data: new Uint8ClampedArray(bestIco.data), width: bestIco.width, height: bestIco.height, colorSpace: 'srgb' };
         } else {
           continue; // Skip unsupported bitmap formats
         }
@@ -191,5 +168,3 @@ export default {
     return new Response(`Could not find or process a valid icon for ${domain}.`, { status: 404 });
   },
 };
-
-interface Env {}
