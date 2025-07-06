@@ -31,238 +31,164 @@ const wasmReady = Promise.all([
 ]);
 
 
-// Defines the structure for an icon candidate
-interface IconCandidate {
-  url: string;
-  rel?: string | null;
-  sizes?: string | null;
-  type?: string | null;
+// Defines the structure for an icon from the external API
+interface Icon {
+  href: string;
+  sizes: string;
+}
+
+// Defines a scored icon structure for sorting
+interface ScoredIcon {
+  icon: Icon;
   score: number;
 }
 
-// Scores a candidate icon based on its attributes to determine the best quality
-function scoreCandidate(candidate: { href: string; rel: string | null; sizes: string | null; type: string | null }): number {
+// Calculates a score for a given icon based on format, size, and source
+function calculateScore(icon: Icon): number {
   let score = 0;
-  const { href, rel, sizes, type } = candidate;
+  const href = icon.href.toLowerCase();
 
-  // Score based on file type
-  if (href.endsWith('.svg') || type === 'image/svg+xml') {
-    score += 1000; // SVG is preferred
-  }
+  // Rule 1: Format (from file extension or data URI)
+  if (href.startsWith('data:')) score -= 1000;
+  else if (href.endsWith('.svg')) score += 1000;
+  else if (href.endsWith('.png')) score += 500;
+  else if (href.endsWith('.ico')) score += 200;
+  else score += 100; // Other image formats (jpg, etc.)
 
-  // Score based on 'rel' attribute
-  if (rel?.includes('apple-touch-icon')) {
-    score += 650;
-  } else if (rel === 'manifest-icon') {
-    score += 650;
-  } else if (rel?.includes('icon')) {
-    score += 100;
-  }
-
-  // Score based on 'sizes' attribute
-  if (sizes) {
-    if (sizes === 'any') {
-      score += 500; // 'any' is often for SVGs
-    } else {
-      const sizeMatch = sizes.match(/(\d+)x(\d+)/);
-      if (sizeMatch) {
-        score += parseInt(sizeMatch[1], 10); // Use width as part of the score
-      }
+  // Rule 2: Size (as a bonus)
+  if (icon.sizes && icon.sizes !== 'unknown') {
+    const size = parseInt(icon.sizes.split('x')[0], 10);
+    if (!isNaN(size)) {
+      score += size;
     }
   }
-  
-  // og:image is a low-priority fallback
-  if (rel === 'og:image') {
-      score = 50;
-  }
+
+  // Rule 3: Source reputation and keywords
+  if (href.includes('apple-touch-icon')) score += 50;
+  if (href.includes('google.com/s2/favicons')) score += 30;
+  if (href.includes('icons.duckduckgo.com')) score -= 20;
 
   return score;
 }
 
-// Finds the best possible icon for a given URL
-async function findBestIcon(targetUrl: URL): Promise<string> {
-  const candidates: IconCandidate[] = [];
-  let manifestUrl: string | null = null;
+export default {
+  async fetch(request: Request): Promise<Response> {
+    await wasmReady;
 
-  // HTMLRewriter to collect icon links from the page
-  class IconCollector {
-    element(element: Element) {
-      const tagName = element.tagName;
-      let href: string | null = null;
-      let rel: string | null = null;
-      let sizes: string | null = null;
-      let type: string | null = null;
+    // 1. Parse domain from request URL
+    const requestUrl = new URL(request.url);
+    let path = decodeURIComponent(requestUrl.pathname.slice(1));
 
-      if (tagName === 'link') {
-        rel = element.getAttribute('rel');
-        if (rel && (rel.includes('icon') || rel.includes('apple-touch-icon'))) {
-          href = element.getAttribute('href');
-          sizes = element.getAttribute('sizes');
-          type = element.getAttribute('type');
-        } else if (rel === 'manifest') {
-          const manifestHref = element.getAttribute('href');
-          if (manifestHref) {
-            manifestUrl = new URL(manifestHref, targetUrl).toString();
-          }
-        }
-      } else if (tagName === 'meta') {
-        const property = element.getAttribute('property');
-        if (property === 'og:image') {
-          href = element.getAttribute('content');
-          rel = 'og:image';
-        }
-      }
-
-      if (href) {
-        try {
-          const score = scoreCandidate({ href, rel, sizes, type });
-          candidates.push({
-            url: new URL(href, targetUrl).toString(),
-            rel,
-            sizes,
-            type,
-            score,
-          });
-        } catch (e) {
-          console.error(`Invalid icon URL found: ${href}`);
-        }
-      }
+    if (!path) {
+      return new Response("Please provide a domain or URL in the path, e.g., /example.com", { status: 400 });
     }
-  }
 
-  // 1. Parse HTML to find icon candidates
-  try {
-    const response = await fetch(targetUrl.toString(), {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' }
-    });
-    
-    if (response.ok && response.headers.get('content-type')?.includes('text/html')) {
-      const rewriter = new HTMLRewriter().on('link, meta', new IconCollector());
-      await rewriter.transform(response).arrayBuffer();
+    if (!path.startsWith('http://') && !path.startsWith('https://')) {
+      path = 'https://' + path;
     }
-  } catch (e) {
-    console.error(`Failed to fetch or parse HTML from ${targetUrl}:`, e);
-  }
 
-  // 2. Parse manifest.json if found
-  if (manifestUrl) {
+    let domain;
     try {
-      const manifestResponse = await fetch(manifestUrl);
-      if (manifestResponse.ok) {
-        const manifest = await manifestResponse.json();
-        if (manifest.icons && Array.isArray(manifest.icons)) {
-          for (const icon of manifest.icons) {
-            if (icon.src) {
-              const { src, sizes, type } = icon;
-              const score = scoreCandidate({ href: src, rel: 'manifest-icon', sizes, type });
-              candidates.push({
-                url: new URL(src, manifestUrl).toString(),
-                sizes,
-                type,
-                score,
-                rel: 'manifest-icon',
-              });
-            }
-          }
-        }
+      domain = new URL(path).hostname;
+    } catch (e) {
+      return new Response("Invalid domain or URL provided: " + path, { status: 400 });
+    }
+
+    // 2. Call external API
+    const apiUrl = `https://favicon-downloader-37l.pages.dev/api/favicon/${domain}`;
+    let apiResponse;
+    try {
+      apiResponse = await fetch(apiUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (!apiResponse.ok) {
+        return new Response(`API fetch failed with status: ${apiResponse.status}`, { status: 502 });
       }
     } catch (e) {
-      console.error(`Failed to fetch or parse manifest.json from ${manifestUrl}:`, e);
-    }
-  }
-
-  // 3. Select the best candidate
-  if (candidates.length > 0) {
-    candidates.sort((a, b) => b.score - a.score);
-    console.log("Found candidates:", candidates);
-    return candidates[0].url;
-  }
-
-  // 4. Fallback to /favicon.ico
-  try {
-    const faviconUrl = new URL('/favicon.ico', targetUrl);
-    const res = await fetch(faviconUrl.toString(), { method: 'HEAD' });
-    if (res.ok) {
-      return faviconUrl.toString();
-    }
-  } catch (e) {
-    // Continue to next fallback
-  }
-
-  // 5. Final fallback to Google's favicon service
-  return `https://www.google.com/s2/favicons?domain=${targetUrl.hostname}&sz=128`;
-}
-
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-    let targetParam = url.searchParams.get('url');
-
-    if (!targetParam) {
-      return new Response('Missing url parameter', { status: 400 });
-    }
-
-    if (!targetParam.startsWith('http://') && !targetParam.startsWith('https://')) {
-        targetParam = 'https://' + targetParam;
+      return new Response('API fetch failed.', { status: 502 });
     }
     
-    const targetUrl = new URL(targetParam);
+    const data = await apiResponse.json();
+    const icons: Icon[] = data.icons || [];
 
-    try {
-      await wasmReady;
-
-      const iconUrl = await findBestIcon(targetUrl);
-      const iconResponse = await fetch(iconUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
-
-      if (!iconResponse.ok) {
-        throw new Error(`Failed to fetch the final icon from ${iconUrl}, status: ${iconResponse.status}`);
-      }
-
-      const iconBuffer = await iconResponse.arrayBuffer();
-      const contentType = iconResponse.headers.get('Content-Type') || 'image/png';
-
-      let imageData;
-      if (contentType.includes('png')) {
-        imageData = await pngDecode(iconBuffer);
-      } else if (contentType.includes('jpeg')) {
-        imageData = await jpegDecode(iconBuffer);
-      } else if (contentType.includes('webp')) {
-        imageData = await webpDecode(iconBuffer);
-      } else if (contentType.includes('ico') || contentType.includes('x-icon') || contentType.includes('vnd.microsoft.icon')) {
-        const decodedIcos = decodeIco(iconBuffer);
-        // From the multiple images in an ICO file, select the largest one.
-        const bestIco = decodedIcos.reduce((a, b) => a.width > b.width ? a : b);
-        // Convert it to the format required by @jsquash/resize.
-        imageData = {
-          data: new Uint8ClampedArray(bestIco.data),
-          width: bestIco.width,
-          height: bestIco.height,
-        };
-      } else {
-        // If the content type is not supported for resizing, return the original icon
-        return new Response(iconBuffer, {
-          headers: {
-            'Content-Type': contentType,
-            'Cache-Control': 'public, max-age=86400',
-          },
-        });
-      }
-
-      const resizedImageData = await resize(imageData, { width: 40, height: 40 });
-      const finalIconBuffer = await pngEncode(resizedImageData);
-      
-      return new Response(finalIconBuffer, {
-        headers: {
-          'Content-Type': 'image/png',
-          'Cache-Control': 'public, max-age=86400',
-        },
-      });
-    } catch (error) {
-      console.error(error);
-      return new Response(`Could not find or process favicon for ${targetUrl}. Error: ${error}`, { status: 404 });
+    if (icons.length === 0) {
+      return new Response("No icons found from API.", { status: 404 });
     }
+
+    // 3. Score and sort icons
+    const sortedIcons: ScoredIcon[] = icons
+      .map(icon => ({ icon, score: calculateScore(icon) }))
+      .sort((a, b) => b.score - a.score);
+
+    // 4. Sequentially try to fetch and validate the best icon
+    for (const { icon } of sortedIcons) {
+      // Handle data URI separately
+      if (icon.href.startsWith('data:image/svg+xml')) {
+        try {
+          const parts = icon.href.split(',');
+          const b64 = parts[1];
+          let svgText = atob(b64);
+          // Modify SVG to set width and height
+          svgText = svgText.replace(/<svg/i, `<svg width="40" height="40"`);
+          return new Response(svgText, { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' } });
+        } catch (e) {
+          console.error("Failed to decode or modify data URI SVG:", e);
+          continue;
+        }
+      }
+      
+      // Handle external URL icons
+      try {
+        const imageResponse = await fetch(icon.href, { redirect: 'follow' });
+
+        if (!imageResponse.ok) continue;
+        const contentType = imageResponse.headers.get('Content-Type') || '';
+        if (!contentType.startsWith('image/')) continue;
+        const contentLength = parseInt(imageResponse.headers.get('Content-Length') || '0', 10);
+        if (contentLength > 0 && contentLength < 100) continue;
+
+        // If SVG, modify and return
+        if (contentType.includes('svg')) {
+          let svgText = await imageResponse.text();
+          // Add width and height attributes to the svg tag
+          if (!svgText.match(/width=/i)) {
+            svgText = svgText.replace(/<svg/i, `<svg width="40"`);
+          }
+          if (!svgText.match(/height=/i)) {
+            svgText = svgText.replace(/<svg/i, `<svg height="40"`);
+          }
+          return new Response(svgText, { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' } });
+        }
+
+        // For bitmaps, decode, resize, and encode
+        const imageBuffer = await imageResponse.arrayBuffer();
+        let imageData;
+
+        if (contentType.includes('png')) {
+          imageData = await pngDecode(imageBuffer);
+        } else if (contentType.includes('jpeg')) {
+          imageData = await jpegDecode(imageBuffer);
+        } else if (contentType.includes('webp')) {
+          imageData = await webpDecode(imageBuffer);
+        } else if (contentType.includes('ico') || contentType.includes('x-icon')) {
+          const decodedIcos = decodeIco(imageBuffer);
+          const bestIco = decodedIcos.reduce((a, b) => a.width > b.width ? a : b);
+          imageData = { data: new Uint8ClampedArray(bestIco.data), width: bestIco.width, height: bestIco.height };
+        } else {
+          continue; // Skip unsupported bitmap formats
+        }
+
+        const resizedImageData = await resize(imageData, { width: 128, height: 128 });
+        const finalIconBuffer = await pngEncode(resizedImageData); // Always encode to PNG for consistency
+
+        return new Response(finalIconBuffer, {
+          headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
+        });
+
+      } catch (error) {
+        console.error(`Failed to process icon ${icon.href}:`, error);
+      }
+    }
+
+    return new Response(`Could not find or process a valid icon for ${domain}.`, { status: 404 });
   },
 };
 
