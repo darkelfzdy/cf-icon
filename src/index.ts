@@ -176,7 +176,7 @@ export default {
           continue; // Skip unsupported bitmap formats
         }
 
-        const resizedImageData = await resize(imageData, { width: 128, height: 128 });
+        const resizedImageData = await resize(imageData, { width: 40, height: 40 });
         const finalIconBuffer = await pngEncode(resizedImageData); // Always encode to PNG for consistency
 
         return new Response(finalIconBuffer, {
